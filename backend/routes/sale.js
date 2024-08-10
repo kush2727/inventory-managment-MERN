@@ -19,4 +19,8 @@ router.get('/product/:productId', saleController.getSalesByProductId);
 // Get sales by customer ID
 router.get('/customer/:customerId', saleController.getSalesByCustomerId);
 
+router.delete('/:id',saleController.deleteSale)
+
+router.put('/:id',saleController.updateSale)
+
 module.exports = router;

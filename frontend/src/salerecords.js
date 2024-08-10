@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import axios from 'axios';
+import { updateProduct, updateSale } from './service/service';
 
 const exchangeRate = 83; // 1 USD = 83 INR
 
@@ -12,17 +13,32 @@ const SalesRecords = () => {
     const [formData, setFormData] = useState({
         saleDate: '',
         saleProduct: '',
+        
         saleQuantity: '',
         salePrice: '',
         saleCustomer: ''
     });
-    const [editData, setEditData] = useState(null);
+    const [editData, setEditData] = useState(
+        {products:[]}
+    );
     const [products, setProducts] = useState([]);
+    const closeBtnRef = useRef();
 
     useEffect(() => {
         fetchSalesData();
         fetchProducts();
     }, []);
+
+    useEffect(() => {
+        // Check if products array is not empty and contains items
+        if (editData.products && editData.products.length > 0) {
+            // Set saleProduct to the ID of the first product
+            setEditData(prevData => ({
+                ...prevData,
+                saleProduct: prevData.products[0].id
+            }));
+        }
+    }, [editData.products]); 
 
     const fetchSalesData = async () => {
         try {
@@ -63,10 +79,11 @@ const SalesRecords = () => {
             console.error('Error fetching products:', error);
         }
     };
+    
 
     const calculateTotalAmount = (data) => {
         const total = data.reduce((sum, sale) => sum + (parseFloat(sale?.products[0]?.price) * parseInt(sale.saleQuantity)), 0);
-        setTotalAmount(total * exchangeRate);
+        setTotalAmount(total);
     };
 
     const handleInputChange = (e) => {
@@ -83,29 +100,39 @@ const SalesRecords = () => {
         }
     };
 
-    const handleEditFormSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await axios.put(`http://localhost:3000/api/sales/${editData.id}`, editData, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            fetchSalesData(); // Refresh sales data
-            setEditData(null); // Clear edit data
-        } catch (error) {
-            console.error('Error updating sale:', error);
-        }
-    };
-
+    
     const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this item?')) {
         try {
-            await axios.delete(`http://localhost:3000/api/sales/${id}`);
+            await axios.delete(`http://localhost:3000/sales/${id}`);
             fetchSalesData(); // Refresh sales data
         } catch (error) {
             console.error('Error deleting sale:', error);
         }
+    }
     };
+
+   
+
+    const handelEditFormSubmit = async (e) => {
+        e.preventDefault();
+        const response = await updateSale(editData.id,editData)
+      
+        if(response){
+            fetchSalesData();
+            setEditData({
+                products:[]
+            });
+            closeBtnRef.current.click()
+        }
+
+
+    }
+
+    const getProductPrice = (data)=>{
+    
+        return products?.find((product)=>parseInt(data?.saleProduct) === product?.id)?.price
+    }
 
     return (
         <div>
@@ -144,7 +171,7 @@ const SalesRecords = () => {
                             >
                                 <option value="" disabled>Choose item</option>
                                 {products.map((product) => (
-                                    <option key={product.id} value={product.name}>
+                                    <option key={product.id} value={product.id}>
                                         {product.name}
                                     </option>
                                 ))}
@@ -166,8 +193,9 @@ const SalesRecords = () => {
                                 type="text"
                                 className="form-control"
                                 id="salePrice"
-                                value={formData.salePrice}
-                                onChange={handleInputChange}
+                                value={getProductPrice(formData)}
+                                // onChange={handleInputChange}
+                                disabled
                                 readOnly
                             />
                         </div>
@@ -244,32 +272,23 @@ const SalesRecords = () => {
                     <div className="modal-content">
                         <div className="modal-header">
                             <h5 className="modal-title" id="editSalesModalLabel">Edit Sale</h5>
-                            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <button type="button" ref={closeBtnRef} className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div className="modal-body">
-                            <form id="editSalesForm" onSubmit={handleEditFormSubmit}>
+                            <form id="editSalesForm" onSubmit={handelEditFormSubmit}>
                                 <input type="hidden" id="editSaleId" value={editData?.id || ''} />
-                                <div className="mb-3">
-                                    <label htmlFor="editSaleDate" className="form-label">Date</label>
-                                    <input
-                                        type="date"
-                                        className="form-control"
-                                        id="editSaleDate"
-                                        value={editData?.saleDate || ''}
-                                        onChange={(e) => setEditData({ ...editData, saleDate: e.target.value })}
-                                    />
-                                </div>
                                 <div className="mb-3">
                                     <label htmlFor="editSaleProduct" className="form-label">Item Name</label>
                                     <select
                                         className="form-select"
                                         id="editSaleProduct"
-                                        value={editData?.saleProduct || ''}
-                                        onChange={(e) => setEditData({ ...editData, saleProduct: e.target.value })}
+                                        value={editData?.saleProduct || editData?.products[0]?.id || ''}
+                                        onChange={(e) => setEditData({ ...editData, saleProduct: parseInt(e.target.value) })}
+                                        defaultValue={editData?.products[0]?.id}
                                     >
                                         <option value="" disabled>Choose item</option>
                                         {products.map((product) => (
-                                            <option key={product.id} value={product.name}>
+                                            <option key={product.id} value={product.id}>
                                                 {product.name}
                                             </option>
                                         ))}
@@ -290,9 +309,11 @@ const SalesRecords = () => {
                                     <input
                                         type="text"
                                         className="form-control"
+                                        disabled
                                         id="editSalePrice"
-                                        value={editData?.salePrice || ''}
-                                        onChange={(e) => setEditData({ ...editData, salePrice: e.target.value })}
+                                        value={ getProductPrice(editData)
+                                        }
+                                        // onChange={(e) => setEditData({ ...editData, salePrice: e.target.value })}
                                         readOnly
                                     />
                                 </div>

@@ -59,7 +59,7 @@ exports.searchSales = async (req, res) => {
       queryBuilder = queryBuilder.andWhere('product.price = :price', { price });
     }
     if (productName){
-      queryBuilder = queryBuilder.andWhere('product.name  LIKE :productName', { productName: `%${productName}` });
+      queryBuilder = queryBuilder.andWhere('product.id = :productName', { productName });
     }
 
     // Execute the query
@@ -111,12 +111,12 @@ exports.getSaleById = async (req, res) => {
 
 exports.createSale = async (req, res) => {
   const { customerName, customerEmail, quantity, address, productId } = req.body;
+  console.log(customerName)
 
   // Validate request data
   if (!customerName || !customerEmail || !quantity || !address || !productId) {
     return res.status(400).json({ error: 'All fields are required' });
   }
-
   const saleRepository = getRepository(Sale);
   const productRepository = getRepository(Product);
 
@@ -182,3 +182,98 @@ exports.getSalesByCustomerId = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.deleteSale = async (req, res) => {
+  try {
+    const saleRepository = getRepository(Sale);
+    
+    // Find the sale by ID
+    const sale = await saleRepository.findOne({where:{id:req.params.id}}, { relations: ['products'] });
+    if (!sale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+    
+    // Delete the sale
+    const result = await saleRepository.remove(sale);
+    if (result) {
+      res.status(204).end(); // No content, successful deletion
+    } else {
+      res.status(500).json({ error: 'Failed to delete sale' });
+    }
+  } catch (error) {
+    console.error('Error deleting sale:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+exports.updateSale = async (req, res) => {
+  console.log(req.body)
+  const { saleCustomer: customerName, saleQuantity: quantity, saleProduct } = req.body;
+
+  // Validate request data
+  if (!customerName && quantity === undefined && !saleProduct) {
+    return res.status(400).json({ error: 'At least one field (customerName, quantity, saleProduct) is required to update' });
+  }
+
+  try {
+    const saleRepository = getRepository(Sale);
+    const productRepository = getRepository(Product);
+
+    // Find the sale by ID
+    const sale = await saleRepository.findOne({ where: { id: req.params.id } }, { relations: ['products'] });
+    if (!sale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    // Initialize products as an empty array if it's undefined
+    if (!sale.products) {
+      sale.products = [];
+    }
+
+    // Update customer name if provided
+    if (customerName) {
+      sale.customerName = customerName;
+    }
+
+    // Handle quantity and product update
+    if (quantity !== undefined || saleProduct) {
+      // If updating quantity, add the old product quantities back to stock
+      for (const saleProduct of sale.products) {
+        const product = await productRepository.findOne({ where: { id: saleProduct.id } });
+        if (product) {
+          product.quantity += saleProduct.quantity; // Add back the quantity to stock
+          await productRepository.save(product); // Save the updated product stock
+        }
+      }
+
+      // Clear the existing products
+      sale.products = [];
+
+      // If a new product is provided, add it to the sale
+      if (saleProduct) {
+        const newProduct = await productRepository.findOne({ where: { id: saleProduct } });
+        if (!newProduct) {
+          return res.status(404).json({ error: 'Product does not exist' });
+        }
+
+        // Reduce the product quantity
+        newProduct.quantity -= quantity;
+        await productRepository.save(newProduct); // Save the updated new product
+
+        // Add the new product to the sale
+        sale.products.push(newProduct);
+        sale.quantity = quantity;
+      }
+    }
+
+    // Save the up
+    await saleRepository.save(sale);
+
+    res.json(sale);
+  } catch (error) {
+    console.error('Error updating sale:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+

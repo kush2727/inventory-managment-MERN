@@ -52,3 +52,35 @@ export const deleteProduct = async (id) => {
         throw error;
     }
 };
+
+export const updateSale = async (saleId, updateData) => {
+    try {
+      const response = await axios.put(`http://localhost:3000/sales/${saleId}`, updateData,{
+        headers:{
+            'Content-Type': 'application/json',
+        }
+      });
+      if (response.status === 200) {
+        // Success
+        alert('Sale updated successfully!');
+        return response.data;
+      } else {
+        // Handle unexpected status codes
+        alert('Unexpected response from server.');
+        return null;
+      }
+    } catch (error) {
+      // Error handling
+      if (error.response) {
+        // Server responded with a status other than 2xx
+        alert(`Error: ${error.response.data.error || 'An error occurred'}`);
+      } else if (error.request) {
+        // No response received
+        alert('Network error. Please try again later.');
+      } else {
+        // Error setting up the request
+        alert('Error setting up request: ' + error.message);
+      }
+      return null;
+    }
+  };

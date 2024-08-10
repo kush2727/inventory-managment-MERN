@@ -12,7 +12,8 @@ const AdminPanel = () => {
     name: '',
     quantity: '',
     price: '',
-    category: ''
+    category: '',
+    image:''
   });
   const [imgPreview, setImgPreview] = useState('./image/default-item.webp');
   const [currentItemIndex, setCurrentItemIndex] = useState(null);
@@ -41,6 +42,7 @@ const AdminPanel = () => {
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
+    setFormData((data)=>({...data,image:file}))
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -56,14 +58,14 @@ const AdminPanel = () => {
       console.error('All fields are required');
       return;
     }
-    const { name, quantity, price, category } = formData // Assuming formState holds your form values
+    const { name, quantity, price, category,image } = formData // Assuming formState holds your form values
 
     const productData = new FormData();
     productData.append('name', name);
     productData.append('quantity', quantity);
     productData.append('price', price);
     productData.append('category', category);
-    productData.append('image',imgPreview)
+    productData.append('image',image)
    
 
     try {
@@ -104,7 +106,7 @@ const AdminPanel = () => {
   const handleEdit = (index) => {
     setCurrentItemIndex(index);
     setFormData(items[index]);
-    setImgPreview(items[index].image);
+    setImgPreview(items[index].image || './image/default-item.webp');
     setEditMode(true);
     setViewMode(false);
     setShowModal(true);
@@ -141,6 +143,14 @@ const AdminPanel = () => {
     });
     setImgPreview('./image/default-item.webp');
   };
+
+  const setModelImage = () => {
+    if(editMode && imgPreview === './image/default-item.webp'  ){
+      
+      return imageURL+items[currentItemIndex].image 
+    }
+    return imgPreview;
+  }
 
   return (
     <div>
@@ -239,7 +249,7 @@ const AdminPanel = () => {
                         <input type="file" id="imgInput" onChange={handleImageChange} />
                         <i className="bi bi-plus-circle-dotted"></i>
                       </label>
-                      <img src={imgPreview} alt="Item" width="200" height="200" className="img" />
+                      <img src={setModelImage()} alt="Item" width="200" height="200" className="img" />
                     </div>
                     <div className="inputField">
                       <div>

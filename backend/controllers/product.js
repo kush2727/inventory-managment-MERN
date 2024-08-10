@@ -53,7 +53,7 @@ exports.updateProductById = async (req, res) => {
       product.quantity = quantity || product.quantity;
       product.category = category || product.category
       if (req.file) {
-        product.image = req.file.path;
+        product.image = req.file.filename;
       }
 
       await productRepository.save(product);
